@@ -1,15 +1,16 @@
 import os
-from threading import Thread
+import asyncio
 from flask import Flask
+from threading import Thread
 from telegram import Update
 from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
 
-# Flask dummy web server for Render port check
+# Flask Server for Render Health Check
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Bot is running 24/7!"
+    return "Bot is Alive!"
 
 def run_flask():
     port = int(os.environ.get("PORT", 10000))
@@ -26,28 +27,41 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sender_id = update.message.from_user.id
     sender_name = update.message.from_user.first_name or "Unknown"
 
-    # Admin nijoke auto-reply ba forward korbe na
     if sender_id == MY_CHAT_ID:
         return
 
     user_msg = update.message.text or "[Non-text message]"
 
-    # Sender-ke auto response
+    # Reply to user
     await update.message.reply_text(
         "Assalamu Alaikum! Currently I am offline. Your message has been forwarded to my admin."
     )
 
-    # Admin-ke notification pathano
-    forward_text = f"📩 New Message Received!\n\nFrom: {sender_name} ({sender_id})\nMessage: {user_msg}"
+    # Forward to Admin
+    forward_text = f"📩 **New Message!**\n\n👤 **From:** {sender_name} (`{sender_id}`)\n💬 **Message:** {user_msg}"
     await context.bot.send_message(chat_id=MY_CHAT_ID, text=forward_text)
 
-if __name__ == '__main__':
-    # Start Flask Web Server
-    Thread(target=run_flask).start()
-
-    # Start Telegram Bot
-    print("Secretary Bot is running...")
+async def start_bot():
     application = ApplicationBuilder().token(BOT_TOKEN).build()
     application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
-    application.run_polling()
+    await application.initialize()
+    await application.start()
+    await application.updater.start_polling()
+    print("Bot is polling...")
+
+if __name__ == '__main__':
+    # Start Web Server in background thread
+    t = Thread(target=run_flask)
+    t.daemon = True
+    t.start()
+
+    # Run Telegram Bot in Async Event Loop
+    loop = asyncio.get_event_loop()
+    loop.create_task(start_bot())
+    loop.run_forever()
+
+
+
+
+
 
