@@ -1,52 +1,52 @@
 import os
-from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
+import asyncio
+from threading import Thread
+from flask import Flask
+from telethon import TelegramClient, events
 
-# Render এ এনভায়রনমেন্ট ভ্যারিয়েবল ব্যবহার করা ভালো, তবে আপনি চাইলে সরাসরি টোকেন ও চ্যাট আইডি বসাতে পারেন
-BOT_TOKEN = os.getenv("BOT_TOKEN", "8703315848:AAHgpmb0xH58vedt3hAE7R6lgXUhsKXOO9U")
-MY_CHAT_ID = int(os.getenv("MY_CHAT_ID", "8989638281"))
+# Render port binding dummy web server
+app = Flask(__name__)
 
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.effective_user.id
-    if user_id == MY_CHAT_ID:
-        await update.message.reply_text("স্বাগতম স্যার! সেক্রেটারী মোড সক্রিয় আছে।")
-    else:
-        await update.message.reply_text(
-            f"হ্যালো {update.effective_user.first_name}!\n\n"
-            "আমি স্যারের সিক্রেটারি। স্যার বর্তমানে ব্যস্ত আছেন। "
-            "আপনার মেসেজটি স্যারের কাছে পৌঁছে দেওয়া হয়েছে।"
-        )
+@app.route('/')
+def home():
+    return "Bot is running 24/7!"
 
-async def secretary_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    incoming_text = update.message.text
+def run_flask():
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
 
-    if user.id == MY_CHAT_ID:
-        await update.message.reply_text("স্যার, আমি আপনার নতুন নির্দেশনার জন্য প্রস্তুত।")
-        return
+# Telegram Bot Setup
+API_ID = 26569107  # Apnar API ID
+API_HASH = '1f440a33a38cdca3efec50c764e5256e'  # Apnar API Hash
+BOT_TOKEN = '8129929285:AAGmG4eJ4e0d4H205kXp8cR8t2V_y3m2k_0'  # Apnar Bot Token
+MY_CHAT_ID = 6842013894  # Apnar Personal Telegram ID
 
-    # ভিজিটরকে মেসেজ
-    await update.message.reply_text(
-        f"ধন্যবাদ {user.first_name}! আপনার মেসেজটি স্যারকে জানানো হয়েছে।"
-    )
+bot = TelegramClient('secretary_bot', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
 
-    # আপনাকে (মালিককে) মেসেজ ফরওয়ার্ড
-    forward_message = (
-        f"📩 **নতুন মেসেজ!**\n\n"
-        f"👤 **প্রেরক:** {user.full_name} (@{user.username})\n"
-        f"🆔 **User ID:** `{user.id}`\n"
-        f"💬 **মেসেজ:** {incoming_text}"
-    )
-    await context.bot.send_message(
-        chat_id=MY_CHAT_ID, 
-        text=forward_message, 
-        parse_mode="Markdown"
-    )
+@bot.on(events.NewMessage)
+async def handle_new_message(event):
+    if event.is_private:
+        sender = await event.get_sender()
+        sender_name = sender.first_name if sender else "Unknown"
+        sender_id = event.sender_id
+        
+        if sender_id == MY_CHAT_ID:
+            return
+
+        user_msg = event.text or "[Non-text message]"
+        
+        # Auto-reply to sender
+        await event.reply("Assalamu Alaikum! Currently I am offline. Your message has been forwarded to my admin.")
+        
+        # Forward message to Admin
+        forward_text = f"📩 **New Message Received!**\n\n👤 **From:** {sender_name} (`{sender_id}`)\n💬 **Message:** {user_msg}"
+        await bot.send_message(MY_CHAT_ID, forward_text)
 
 if __name__ == '__main__':
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), secretary_handler))
-    print("বট সফলভাবে চালু হয়েছে...")
-    app.run_polling()
+    # Start Web server in background thread for Render Port check
+    Thread(target=run_flask).start()
+    
+    # Start Telegram Bot
+    print("Secretary Bot is running...")
+    bot.run_until_disconnected()
 
