@@ -14,7 +14,7 @@ def run_flask():
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
 
-BOT_TOKEN = '8129929285:AAGmG4eJ4e0d4H205kXp8cR8t2V_y3m2k_0'
+BOT_TOKEN = '8703315848:AAHqVxwVw4pSjVfvvRvTGSI_7N9nLJ80A50'
 MY_CHAT_ID = 6842013894
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
