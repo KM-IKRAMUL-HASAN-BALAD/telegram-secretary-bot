@@ -1,9 +1,10 @@
 import os
-import asyncio
 from threading import Thread
 from flask import Flask
-from telethon import TelegramClient, events
+from telegram import Update
+from telegram.ext import ApplicationBuilder, ContextTypes, MessageHandler, filters
 
+# Flask dummy web server for Render port check
 app = Flask(__name__)
 
 @app.route('/')
@@ -14,29 +15,39 @@ def run_flask():
     port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)
 
-API_ID = 26569107
-API_HASH = '1f440a33a38cdca3efec50c764e5256e'
+# Credentials
 BOT_TOKEN = '8129929285:AAGmG4eJ4e0d4H205kXp8cR8t2V_y3m2k_0'
 MY_CHAT_ID = 6842013894
 
-bot = TelegramClient('secretary_bot', API_ID, API_HASH).start(bot_token=BOT_TOKEN)
+async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not update.message or not update.message.from_user:
+        return
 
-@bot.on(events.NewMessage)
-async def handle_new_message(event):
-    if event.is_private:
-        sender = await event.get_sender()
-        sender_name = sender.first_name if sender else "Unknown"
-        sender_id = event.sender_id
-        
-        if sender_id == MY_CHAT_ID:
-            return
+    sender_id = update.message.from_user.id
+    sender_name = update.message.from_user.first_name or "Unknown"
 
-        user_msg = event.text or "[Non-text message]"
-        await event.reply("Assalamu Alaikum! Currently I am offline. Your message has been forwarded to my admin.")
-        forward_text = f"📩 **New Message Received!**\n\n👤 **From:** {sender_name} (`{sender_id}`)\n💬 **Message:** {user_msg}"
-        await bot.send_message(MY_CHAT_ID, forward_text)
+    # Admin nijoke auto-reply ba forward korbe na
+    if sender_id == MY_CHAT_ID:
+        return
+
+    user_msg = update.message.text or "[Non-text message]"
+
+    # Sender-ke auto response
+    await update.message.reply_text(
+        "Assalamu Alaikum! Currently I am offline. Your message has been forwarded to my admin."
+    )
+
+    # Admin-ke notification pathano
+    forward_text = f"📩 New Message Received!\n\nFrom: {sender_name} ({sender_id})\nMessage: {user_msg}"
+    await context.bot.send_message(chat_id=MY_CHAT_ID, text=forward_text)
 
 if __name__ == '__main__':
+    # Start Flask Web Server
     Thread(target=run_flask).start()
+
+    # Start Telegram Bot
     print("Secretary Bot is running...")
-    bot.run_until_disconnected()
+    application = ApplicationBuilder().token(BOT_TOKEN).build()
+    application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_message))
+    application.run_polling()
+
